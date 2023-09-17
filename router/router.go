@@ -1,15 +1,15 @@
 package router
 
 import (
+	controller "github.com/PratikforCoding/BusoFact.git/controllers"
 	"github.com/go-chi/chi/v5"
-	"github.com/PratikforCoding/BusoFact.git/handlers"
 )
-func Router() *chi.Mux {
+func Router(apiCfg *controller.APIConfig) *chi.Mux {
 	router := chi.NewRouter()
 
-	router.Get("/getbuses", handler.HandlerGetBuses)
-	router.Get("/getbusbyname", handler.HandlerAddBuses)
-	router.Post("/addbus", handler.HandlerAddBuses)
+	router.Get("/getbuses", apiCfg.HandlerGetBuses)
+	router.Get("/getbusbyname", apiCfg.HandlerGetBusByName)
+	router.Post("/addbus", apiCfg.HandlerAddBuses)
 
 	router.Mount("/api", router)
 
