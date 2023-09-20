@@ -10,26 +10,32 @@ import (
 )
 
 const dbName = "businfo"
-const colName = "buses"
+const busColName = "buses"
+const usrColName = "users"
 
-var collection *mongo.Collection
+var busCollection *mongo.Collection
+var usrCollection *mongo.Collection
+
 
 var client *mongo.Client
 
-func CreateDB(mongoUri string) (*mongo.Collection, error) {
+func CreateDB(mongoUri string) (*mongo.Collection, *mongo.Collection, error) {
 	clientOption := options.Client().ApplyURI(mongoUri)
 	var err error
 	client, err = mongo.Connect(context.TODO(), clientOption)
 	if err != nil {
 		log.Fatal(err)
-		return nil, err
+		return nil, nil, err
 	}
 	fmt.Println("MongoDB connection success")
-	collection = client.Database(dbName).Collection(colName)
+	busCollection = client.Database(dbName).Collection(busColName)
+	usrCollection = client.Database(dbName).Collection(usrColName)
 	fmt.Println("Collection instance is ready")
 
-	return collection, nil	
+	return busCollection, usrCollection, nil	
 }
+
+
 
 func CloseDB() {
 	if client != nil {

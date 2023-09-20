@@ -21,13 +21,13 @@ func main() {
 
 	mongouri := os.Getenv("connectlink")
 
-	col, err := database.CreateDB(mongouri)
+	busCol, usrCol, err := database.CreateDB(mongouri)
 	if err != nil {
 		log.Fatal("Didn't create connection to mongodb")
 	}
 	defer database.CloseDB()
 
-	apicfg := controller.NewAPIConfig(col)
+	apicfg := controller.NewAPIConfig(busCol, usrCol)
 
 	fmt.Println("MongoDB API")
 	r := router.Router(apicfg)

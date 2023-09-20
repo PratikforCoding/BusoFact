@@ -6,6 +6,8 @@ import (
 	"strings"
 
 	reply "github.com/PratikforCoding/BusoFact.git/json"
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 func (apiCfg *APIConfig)HandlerGetBuses(w http.ResponseWriter, r *http.Request) {
@@ -68,3 +70,64 @@ func (apiCfg *APIConfig)HandlerGetBusByName(w http.ResponseWriter, r *http.Reque
 	}
 	reply.RespondWithJson(w, http.StatusFound, foundBus)
 }
+
+func (apiCfg *APIConfig)HandlerCreateAccount(w http.ResponseWriter, r *http.Request) {
+	type parameters struct {
+		Email string `json:"email"`
+		Password string `json:"password"`
+	}
+
+	decoder := json.NewDecoder(r.Body)
+	params := parameters{}
+	err := decoder.Decode(&params)
+	if err != nil {
+		reply.RespondWtihError(w, http.StatusInternalServerError, "Couldn,t decode parameters")
+		return
+	}
+	
+	user, err := apiCfg.createUser(params.Email, params.Password)
+	if err != nil {
+		reply.RespondWtihError(w, http.StatusConflict, "User already exists")
+		return
+	}
+	idStr := user["_id"].(primitive.ObjectID).Hex()
+	retUser := bson.M {
+		"email": user["email"].(string),
+		"id": idStr,
+	}
+	reply.RespondWithJson(w, http.StatusCreated, retUser)
+}
+
+func (apiCfg *APIConfig)HandlerLogin(w http.ResponseWriter, r *http.Request) {
+	type parameters struct {
+		Email string `json:"email"`
+		Password string `json:"password"`
+	}
+
+	decoder := json.NewDecoder(r.Body)
+	params := parameters{}
+	err := decoder.Decode(&params)
+	if err != nil {
+		reply.RespondWtihError(w, http.StatusInternalServerError, "Couldn't decode parameters")
+		return
+	}
+
+	user, err := apiCfg.userLogin(params.Email, params.Password)
+	if err != nil {
+		errorMsg := "User authentication failed"
+		if err.Error() == "user doesn't exist" {
+			errorMsg = "User doesn't exist"
+		} else if err.Error() == "wrong password" {
+			errorMsg = "Wrong password"
+		}
+		reply.RespondWtihError(w, http.StatusNotFound, errorMsg)
+		return
+	}
+	idStr := user["_id"].(primitive.ObjectID).Hex()
+	retUser := bson.M {
+		"email": user["email"].(string),
+		"id": idStr,
+	}
+	reply.RespondWithJson(w, http.StatusOK, retUser)
+}
+
