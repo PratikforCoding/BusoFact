@@ -73,8 +73,10 @@ func (apiCfg *APIConfig)HandlerGetBusByName(w http.ResponseWriter, r *http.Reque
 
 func (apiCfg *APIConfig)HandlerCreateAccount(w http.ResponseWriter, r *http.Request) {
 	type parameters struct {
+		Username string `json:"username"`
 		Email string `json:"email"`
 		Password string `json:"password"`
+		ConfirmPassword string `json:"confpassword"`
 	}
 
 	decoder := json.NewDecoder(r.Body)
@@ -85,13 +87,19 @@ func (apiCfg *APIConfig)HandlerCreateAccount(w http.ResponseWriter, r *http.Requ
 		return
 	}
 	
-	user, err := apiCfg.createUser(params.Email, params.Password)
+	if params.Password != params.ConfirmPassword {
+		reply.RespondWtihError(w, http.StatusNotAcceptable, "confirm password correctly")
+		return
+	}
+
+	user, err := apiCfg.createUser(params.Username, params.Email, params.Password)
 	if err != nil {
 		reply.RespondWtihError(w, http.StatusConflict, "User already exists")
 		return
 	}
 	idStr := user["_id"].(primitive.ObjectID).Hex()
 	retUser := bson.M {
+		"username": user["username"].(string),
 		"email": user["email"].(string),
 		"id": idStr,
 	}
@@ -125,6 +133,7 @@ func (apiCfg *APIConfig)HandlerLogin(w http.ResponseWriter, r *http.Request) {
 	}
 	idStr := user["_id"].(primitive.ObjectID).Hex()
 	retUser := bson.M {
+		"username": user["username"].(string),
 		"email": user["email"].(string),
 		"id": idStr,
 	}

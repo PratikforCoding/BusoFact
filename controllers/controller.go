@@ -131,7 +131,7 @@ func (apiCfg *APIConfig)getBusByName(name string) (bson.M, error) {
 	return bus, nil
 }
 
-func (apiCfg *APIConfig)createUser(email, password string) (bson.M, error) {
+func (apiCfg *APIConfig)createUser(username, email, password string) (bson.M, error) {
 	foundUser, err := apiCfg.getUser(email)
 	if err != nil {
 		hash, err := auth.HashedPassword(password)
@@ -139,6 +139,7 @@ func (apiCfg *APIConfig)createUser(email, password string) (bson.M, error) {
 			return nil, err
 		}
 		user := bson.M{
+			"username": username,
 			"email": email,
 			"password": hash,
 		}
