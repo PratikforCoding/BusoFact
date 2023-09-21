@@ -166,6 +166,7 @@ func (apiCfg *APIConfig)userLogin(email, password string) (bson.M, error) {
 	userHash := user["password"].(string)
 	err = auth.CheckPasswordHash(password, userHash)
 	if err != nil {
+		fmt.Println(err)
 		return nil, errors.New("wrong password")
 	}
 	return user, nil
@@ -177,7 +178,7 @@ func (apiCfg *APIConfig)getUser(email string) (bson.M, error) {
 	err := apiCfg.UserCollection.FindOne(context.TODO(), filter).Decode(&user)
 	if err != nil {
 		if err == mongo.ErrNoDocuments {
-			fmt.Println("User not found")
+			fmt.Println("user not found")
 			return nil , errors.New("user not found")
 		} else {
 			log.Fatal(err)
