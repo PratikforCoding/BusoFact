@@ -10,15 +10,17 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
+	"github.com/PratikforCoding/BusoFact.git/models"
 )
 
 type APIConfig struct {
+	jwtSecret string
 	BusCollection *mongo.Collection
 	UserCollection *mongo.Collection
 }
 
-func NewAPIConfig(busCol, usrCol *mongo.Collection) *APIConfig {
-	return &APIConfig{BusCollection: busCol, UserCollection: usrCol}
+func NewAPIConfig(busCol, usrCol *mongo.Collection, jwtSecret string) *APIConfig {
+	return &APIConfig{BusCollection: busCol, UserCollection: usrCol, jwtSecret: jwtSecret}
 }
 
 func (apiCfg *APIConfig)getBuses(source string, destination string) []primitive.M {
@@ -131,56 +133,58 @@ func (apiCfg *APIConfig)getBusByName(name string) (bson.M, error) {
 	return bus, nil
 }
 
-func (apiCfg *APIConfig)createUser(username, email, password string) (bson.M, error) {
+func (apiCfg *APIConfig)createUser(firstName, lastName, email, password string) (model.User, error) {
 	foundUser, err := apiCfg.getUser(email)
 	if err != nil {
 		hash, err := auth.HashedPassword(password)
 		if err != nil {
-			return nil, err
+			return model.User{}, err
 		}
-		user := bson.M{
-			"username": username,
-			"email": email,
-			"password": hash,
+		user := model.User{
+			FristName: firstName,
+			LastName: lastName,
+			Email: email,
+			Password: hash,
 		}
 
 		inserted, err := apiCfg.UserCollection.InsertOne(context.Background(), user)
 		if err != nil {
 			log.Fatal(err)
 		}
-		fmt.Println("Inserted user id:", inserted.InsertedID)
+		log.Println("Inserted user id:", inserted.InsertedID)
 		createdUser, err := apiCfg.getUser(email)
 		if err != nil {
 			log.Println(err)
-			return nil, err
+			return model.User{}, err
 		}
 		return createdUser, nil
 	}
 	return foundUser, errors.New("user already exists")
 }
 
-func (apiCfg *APIConfig)userLogin(email, password string) (bson.M, error) {
+func (apiCfg *APIConfig)userLogin(email, password string) (model.User, error) {
+	var user model.User
 	user, err := apiCfg.getUser(email)
 	if err != nil {
-		return nil, errors.New("user doesn't exist")
+		return model.User{}, errors.New("user doesn't exist")
 	}
-	userHash := user["password"].(string)
+	userHash := user.Password
 	err = auth.CheckPasswordHash(password, userHash)
 	if err != nil {
-		fmt.Println(err)
-		return nil, errors.New("wrong password")
+		log.Println(err)
+		return model.User{}, errors.New("wrong password")
 	}
 	return user, nil
 }
 
-func (apiCfg *APIConfig)getUser(email string) (bson.M, error) {
+func (apiCfg *APIConfig)getUser(email string) (model.User, error) {
 	filter := bson.M{"email":email}
-	var user bson.M
+	var user model.User
 	err := apiCfg.UserCollection.FindOne(context.TODO(), filter).Decode(&user)
 	if err != nil {
 		if err == mongo.ErrNoDocuments {
 			fmt.Println("user not found")
-			return nil , errors.New("user not found")
+			return model.User{} , errors.New("user not found")
 		} else {
 			log.Fatal(err)
 		}
@@ -188,4 +192,6 @@ func (apiCfg *APIConfig)getUser(email string) (bson.M, error) {
 	
 	return user, nil
 }
+
+ 
 

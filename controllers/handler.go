@@ -2,28 +2,23 @@ package controller
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
-	"strings"
+	"time"
 
+	"github.com/PratikforCoding/BusoFact.git/auth"
 	reply "github.com/PratikforCoding/BusoFact.git/json"
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
+	model "github.com/PratikforCoding/BusoFact.git/models"
 )
 
 func (apiCfg *APIConfig)HandlerGetBuses(w http.ResponseWriter, r *http.Request) {
-	type parameters struct {
-		Source string `json:"source"`
-		Destination string `json:"destination"`
-	}
-	decoder := json.NewDecoder(r.Body)
-	params := parameters{}
-	err := decoder.Decode(&params)
-	if err != nil {
-		reply.RespondWtihError(w, http.StatusInternalServerError, "Couldn't decode parameters")
+	if r.Method != http.MethodGet {
+		http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
 		return
 	}
-	source := strings.ToLower(params.Source)
-	destination := strings.ToLower(params.Destination)
+
+	source := r.URL.Query().Get("source")
+	destination := r.URL.Query().Get("destination")
 
 	buses := apiCfg.getBuses(source, destination)
 	reply.RespondWithJson(w, http.StatusFound, buses)
@@ -34,9 +29,22 @@ func (apiCfg *APIConfig)HandlerAddBuses(w http.ResponseWriter, r *http.Request) 
 		Name string `json:"name"`
 		StopageName string `json:"stopageName"`
 	}
+
+	token, err := auth.GetTokenFromCookie(r)
+	if err != nil {	
+		reply.RespondWtihError(w, http.StatusUnauthorized, "Couldn't get token from request")
+		return
+	}
+
+	claims, err := auth.ValidateJWT(token, apiCfg.jwtSecret)
+	if err != nil {
+		reply.RespondWtihError(w, http.StatusUnauthorized, "Couldn't validate token")
+		return
+	}
+	fmt.Println(claims)
 	decoder := json.NewDecoder(r.Body)
 	params := parameters{}
-	err := decoder.Decode(&params)
+	err = decoder.Decode(&params)
 	if err != nil {
 		reply.RespondWtihError(w, http.StatusInternalServerError, "Couldn't decode parameters")
 		return
@@ -73,7 +81,8 @@ func (apiCfg *APIConfig)HandlerGetBusByName(w http.ResponseWriter, r *http.Reque
 
 func (apiCfg *APIConfig)HandlerCreateAccount(w http.ResponseWriter, r *http.Request) {
 	type parameters struct {
-		Username string `json:"username"`
+		FristName string `json:"firstName"`
+		LastName string `json:"lastName"`
 		Email string `json:"email"`
 		Password string `json:"password"`
 		ConfirmPassword string `json:"confpassword"`
@@ -92,16 +101,17 @@ func (apiCfg *APIConfig)HandlerCreateAccount(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	user, err := apiCfg.createUser(params.Username, params.Email, params.Password)
+	user, err := apiCfg.createUser(params.FristName, params.LastName, params.Email, params.Password)
+
 	if err != nil {
-		reply.RespondWtihError(w, http.StatusConflict, "User already exists")
+		reply.RespondWtihError(w, http.StatusInternalServerError, "error creating user")
 		return
 	}
-	idStr := user["_id"].(primitive.ObjectID).Hex()
-	retUser := bson.M {
-		"username": user["username"].(string),
-		"email": user["email"].(string),
-		"id": idStr,
+	retUser := model.User{
+		ID: user.ID,
+		FristName: user.FristName,
+		LastName: user.LastName,
+		Email: user.Email,
 	}
 	reply.RespondWithJson(w, http.StatusCreated, retUser)
 }
@@ -131,11 +141,43 @@ func (apiCfg *APIConfig)HandlerLogin(w http.ResponseWriter, r *http.Request) {
 		reply.RespondWtihError(w, http.StatusNotFound, errorMsg)
 		return
 	}
-	idStr := user["_id"].(primitive.ObjectID).Hex()
-	retUser := bson.M {
-		"username": user["username"].(string),
-		"email": user["email"].(string),
-		"id": idStr,
+
+	accessTokenTime := 60 * 60
+	refreshTokenTime := 60 *24 * 60 * 60
+	accessToken, err := auth.MakeAccessToken(user.ID.Hex(), apiCfg.jwtSecret, time.Duration(accessTokenTime) * time.Second)
+	if err != nil {
+		reply.RespondWtihError(w, http.StatusInternalServerError, "Couldn't not create Access Token")
+		return
+	}
+
+	refreshToken, err := auth.MakeRefreshToken(user.ID.Hex(), apiCfg.jwtSecret, time.Duration(refreshTokenTime) * time.Second)
+	if err != nil {
+		reply.RespondWtihError(w, http.StatusInternalServerError, "Couldn't not create Access Token")
+		return
+	}
+
+	http.SetCookie(w, &http.Cookie{
+		Name:     "access_token",
+		Value:    accessToken,
+		HttpOnly: true,
+		Secure:   true, 
+		SameSite: http.SameSiteLaxMode,
+	})
+	
+	http.SetCookie(w, &http.Cookie{
+		Name:     "refresh_token",
+		Value:    refreshToken,
+		HttpOnly: true,
+		Secure:   true, 
+		SameSite: http.SameSiteLaxMode,
+	})
+	
+
+	retUser := model.User{
+		ID: user.ID,
+		FristName: user.FristName,
+		LastName: user.LastName,
+		Email: user.Email,
 	}
 	reply.RespondWithJson(w, http.StatusOK, retUser)
 }

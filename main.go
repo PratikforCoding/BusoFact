@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"os"
 
-	controller "github.com/PratikforCoding/BusoFact.git/controllers"
+	"github.com/PratikforCoding/BusoFact.git/controllers" 
 	"github.com/PratikforCoding/BusoFact.git/database"
 	"github.com/PratikforCoding/BusoFact.git/router"
 	"github.com/joho/godotenv"
@@ -20,6 +20,7 @@ func main() {
 	}
 
 	mongouri := os.Getenv("connectlink")
+	jwtSecret := os.Getenv("JWT_SECRET")
 
 	busCol, usrCol, err := database.CreateDB(mongouri)
 	if err != nil {
@@ -27,7 +28,7 @@ func main() {
 	}
 	defer database.CloseDB()
 
-	apicfg := controller.NewAPIConfig(busCol, usrCol)
+	apicfg := controller.NewAPIConfig(busCol, usrCol, jwtSecret)
 
 	fmt.Println("MongoDB API")
 	r := router.Router(apicfg)
