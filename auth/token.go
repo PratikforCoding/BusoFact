@@ -36,13 +36,22 @@ func MakeRefreshToken(id string, jwtSecret string, expiresIn time.Duration) (str
     return token.SignedString(signingKey)
 }
 
-func GetTokenFromCookie(r *http.Request) (string, error) {
+func GetTokenFromCookie(r *http.Request, tokenSecret string) (string, error) {
     // Get access_token from cookie
     cookie, err := r.Cookie("access_token")
     if err != nil {
 		if err == http.ErrNoCookie {
-			// If the cookie is not set, return an unauthorized status
-			return "", errors.New("no cookie included in request")
+			cookie, err = r.Cookie("refresh_token")
+			if err != nil {
+				if err == http.ErrNoCookie {
+					return "", errors.New("no refreshcookie included in request")
+				}
+			}
+			newAccessToken, err := RefreshToken(cookie.Value, tokenSecret)
+			if err != nil {
+				return "", err
+			}
+			return newAccessToken, nil
 		}
 		
 		return "", errors.New("couldn't get cookie from request")
@@ -78,3 +87,42 @@ func ValidateJWT(tokenString, tokenSecret string) (string, error) {
 	return userIDString, nil
 } 
 
+func RefreshToken(tokenString, tokenSecret string) (string, error) {
+	claimsStruct := jwt.RegisteredClaims{}
+	token, err := jwt.ParseWithClaims(
+		tokenString,
+		&claimsStruct,
+		func(token *jwt.Token) (interface{}, error) { return []byte(tokenSecret), nil },
+	)
+	if err != nil {
+		return "", err
+	}
+
+	userIDString, err := token.Claims.GetSubject()
+	if err != nil {
+		return "", err
+	}
+
+	issuer, err := token.Claims.GetIssuer()
+	if err != nil {
+		return "", err
+	}
+	if issuer != "busofact-refresh" {
+		return "", errors.New("invalid issuer")
+	}
+
+	if err != nil {
+		return "", err
+	}
+
+	newToken, err := MakeAccessToken(
+		userIDString,
+		tokenSecret,
+		time.Hour,
+	)
+	if err != nil {
+		return "", err
+	}
+
+	return newToken, nil
+}

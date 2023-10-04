@@ -30,7 +30,7 @@ func (apiCfg *APIConfig)HandlerAddBuses(w http.ResponseWriter, r *http.Request) 
 		StopageName string `json:"stopageName"`
 	}
 
-	token, err := auth.GetTokenFromCookie(r)
+	token, err := auth.GetTokenFromCookie(r, apiCfg.jwtSecret)
 	if err != nil {	
 		reply.RespondWtihError(w, http.StatusUnauthorized, "Couldn't get token from request")
 		return
