@@ -59,11 +59,29 @@ func (apiCfg *APIConfig)HandlerAddBuses(w http.ResponseWriter, r *http.Request) 
 }
 
 func (apiCfg *APIConfig)HandlerGetBusByName(w http.ResponseWriter, r *http.Request) {
-	type parameters struct {
-		Name string `json:"name"`
+	if r.Method != http.MethodGet {
+		http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
+		return
 	}
 
-	decoder := json.NewDecoder(r.Body)
+	busName := r.URL.Query().Get("busname")
+
+	foundBus, err := apiCfg.getBusByName(busName)
+	if err != nil {
+		reply.RespondWtihError(w, http.StatusNotFound, "Bus not found")
+		return 
+	}
+	reply.RespondWithJson(w, http.StatusFound, foundBus)
+}
+
+func (apiCfg *APIConfig) HandlerAddStopage(w http.ResponseWriter, r *http.Request) {
+	type parameters struct {
+		Name string `json:"name"`
+		StopageName string `json:"stopageName"`
+		BeforeStopage string `json:"beforeStopage"`
+	}
+
+	decoder := json.NewDecoder(r.Body);
 	params := parameters{}
 	err := decoder.Decode(&params)
 	if err != nil {
@@ -71,13 +89,14 @@ func (apiCfg *APIConfig)HandlerGetBusByName(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	foundBus, err := apiCfg.getBusByName(params.Name)
+	upadtedBus, err := apiCfg.addBusStopage(params.Name, params.StopageName, params.BeforeStopage)
 	if err != nil {
-		reply.RespondWtihError(w, http.StatusNotFound, "Bus not found")
-		return 
+		reply.RespondWtihError(w, http.StatusInternalServerError, "couldn't update the bus")
+		return
 	}
-	reply.RespondWithJson(w, http.StatusFound, foundBus)
-}
+	reply.RespondWithJson(w, http.StatusOK, upadtedBus)
+
+} 
 
 func (apiCfg *APIConfig)HandlerCreateAccount(w http.ResponseWriter, r *http.Request) {
 	type parameters struct {

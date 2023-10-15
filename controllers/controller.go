@@ -5,7 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
-
+	"time"
 	"github.com/PratikforCoding/BusoFact.git/auth"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -64,73 +64,120 @@ func (apiCfg *APIConfig)getBuses(source string, destination string) []primitive.
 func (apiCfg *APIConfig)addBuses(name, stopageName string) (bson.M, error) {
 	foundBus, err := apiCfg.getBusByName(name)
 	if err != nil {
-		bus := bson.M{
-			"name": name,
-			"stopages": []bson.M{
-				{"stopageNumber": 1, "stopage": stopageName},
+		bus := model.Bus{
+			Name: name,
+			Stopages: []model.Stopage{
+				{
+					StopageNumber: 1,	
+					StopageName: stopageName,
+				},
 			},
 		}
 		inserted, err := apiCfg.BusCollection.InsertOne(context.Background(), bus)
-
 		if err != nil {
 			log.Fatal(err)
+			return nil, err
 		}
 		fmt.Println("Inserted bus id:", inserted.InsertedID)
-		updatedBus, err := apiCfg.getBusByName(name)
+		NewBus, err := apiCfg.getBusByName(name)
 		if err != nil {
 			log.Println(err)
 			return nil, err
 		}
-		return updatedBus, nil
+		
+		return NewBus, nil
 	}
-
-	stopagesNum, ok := foundBus["stopages"].(primitive.A)
-    if !ok {
-        fmt.Println("Invalid document format. 'stopages' field is missing or has an incorrect format.")
-        return bson.M{}, errors.New("wrong document format")
-    }
-
-	stopagesCount := len(stopagesNum) + 1
-
-	filter := bson.M{"name": name}
-	newStopage := bson.M{
-        "stopageNumber": stopagesCount,
-        "stopage":       stopageName,
-    }
-	update := bson.M{
-        "$push": bson.M{"stopages": newStopage},
-    }
-	result, err := apiCfg.BusCollection.UpdateOne(context.TODO(), filter, update)
-    if err != nil {
-        log.Fatal(err)
-    }
-	if result.ModifiedCount == 1 {
-        fmt.Println("Stopage added successfully")
-    } else {
-        fmt.Println("Stopage not added. Bus not found.")
-    }
-	updatedBus, err := apiCfg.getBusByName(name)
-	if err != nil {
-		log.Println(err)
-		return nil, err
-	}
-	return updatedBus, nil
+	return foundBus, nil
 }
 
-func (apiCfg *APIConfig)getBusByName(name string) (bson.M, error) {
-	filter := bson.M{"name": name}
-	var bus bson.M
-	err := apiCfg.BusCollection.FindOne(context.TODO(), filter).Decode(&bus)
-	if err != nil {
-		if err == mongo.ErrNoDocuments {
-			fmt.Println("Bus not found")
-			return bus , errors.New("bus not found")
-		} else {
-			log.Fatal(err)
-		}
-	}
-	
-	return bus, nil
+func (apiCfg *APIConfig) addBusStopage(name, stopage, beforeStopage string) (bson.M, error) {
+    foundBus, err := apiCfg.getBusByName(name)
+    if err != nil {
+        return bson.M{}, errors.New("Couldn't find the bus")
+    }
+
+    // Get the existing stopages
+    existingStopages := foundBus["stopages"].(primitive.A)
+
+    // Find the existing stopage with "beforeStopage" and its position
+    var beforeStopageIndex int
+    var beforeStopageNumber int32
+
+    for i, s := range existingStopages {
+        stop := s.(primitive.M)
+        if stop["stopage"].(string) == beforeStopage {
+            beforeStopageIndex = i
+            beforeStopageNumber = stop["stopageNumber"].(int32)
+            break
+        }
+    }
+
+    if beforeStopageIndex < 0 {
+        return bson.M{}, errors.New("beforeStopage not found")
+    }
+
+    newStopageNumber := beforeStopageNumber + 1
+
+    newStopage := bson.M{
+        "stopageNumber": newStopageNumber,
+        "stopage":      stopage,
+    }
+
+    // Create an empty primitive.A slice for updated stopages
+    updatedStopages := make(primitive.A, 0, len(existingStopages)+1)
+
+    for i, s := range existingStopages {
+        stop := s.(primitive.M)
+        updatedStopages = append(updatedStopages, stop)
+
+        // Append the new stopage after the beforeStopage
+        if i == beforeStopageIndex {
+            updatedStopages = append(updatedStopages, newStopage)
+        }
+
+        // Increment the stopageNumber of stopages after the new one
+        if i > beforeStopageIndex {
+            stop["stopageNumber"] = stop["stopageNumber"].(int32) + 1
+        }
+    }
+
+    // Update the bus document with the new stopages array
+    filter := bson.M{"name": name}
+    update := bson.M{
+        "$set": bson.M{"stopages": updatedStopages},
+    }
+
+    _, err = apiCfg.BusCollection.UpdateOne(context.TODO(), filter, update)
+    if err != nil {
+        log.Fatal(err)
+        return bson.M{}, err
+    }
+
+    updatedBus, err := apiCfg.getBusByName(name)
+    if err != nil {
+        log.Println(err)
+        return bson.M{}, err
+    }
+
+    return updatedBus, nil
+}
+
+func (apiCfg *APIConfig) getBusByName(name string) (bson.M, error) {
+    filter := bson.M{"name": name}
+    var bus bson.M
+    ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second) // Set a reasonable timeout
+    defer cancel()
+
+    err := apiCfg.BusCollection.FindOne(ctx, filter).Decode(&bus)
+    if err != nil {
+        if err == mongo.ErrNoDocuments {
+            fmt.Println("Bus not found")
+            return bus, errors.New("bus not found")
+        } else {
+            log.Fatal(err)
+        }
+    }
+    return bus, nil
 }
 
 func (apiCfg *APIConfig)createUser(firstName, lastName, email, password string) (model.User, error) {

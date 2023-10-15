@@ -14,6 +14,7 @@ func Router(apiCfg *controller.APIConfig) *chi.Mux {
 	apiRouter.Get("/getbusbyname", apiCfg.HandlerGetBusByName)
 
 	userRouter.Put("/addbus", apiCfg.HandlerAddBuses)
+	userRouter.Put("/addstopage", apiCfg.HandlerAddStopage)
 
 	userRouter.Post("/createaccount", apiCfg.HandlerCreateAccount)
 	userRouter.Post("/login", apiCfg.HandlerLogin)
