@@ -8,6 +8,7 @@ func Router(apiCfg *controller.APIConfig) *chi.Mux {
 	router := chi.NewRouter()
 	apiRouter := chi.NewRouter()
 	userRouter := chi.NewRouter()
+	adminRouter := chi.NewRouter()
 	
 
 	apiRouter.Get("/getbuses", apiCfg.HandlerGetBuses)
@@ -19,8 +20,12 @@ func Router(apiCfg *controller.APIConfig) *chi.Mux {
 	userRouter.Post("/createaccount", apiCfg.HandlerCreateAccount)
 	userRouter.Post("/login", apiCfg.HandlerLogin)
 
+	adminRouter.Put("/makeadmin", apiCfg.HandlerMakeAdmin)
+	adminRouter.Get("/getusers", apiCfg.HandlerGetAllUsers)
+
 	router.Mount("/api", apiRouter)
 	router.Mount("/usr", userRouter)
+	router.Mount("/admin", adminRouter)
 
 	return router
 }

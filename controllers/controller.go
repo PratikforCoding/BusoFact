@@ -93,7 +93,7 @@ func (apiCfg *APIConfig)addBuses(name, stopageName string) (bson.M, error) {
 func (apiCfg *APIConfig) addBusStopage(name, stopage, beforeStopage string) (bson.M, error) {
     foundBus, err := apiCfg.getBusByName(name)
     if err != nil {
-        return bson.M{}, errors.New("Couldn't find the bus")
+        return bson.M{}, errors.New("couldn't find the bus")
     }
 
     // Get the existing stopages
@@ -192,6 +192,7 @@ func (apiCfg *APIConfig)createUser(firstName, lastName, email, password string) 
 			LastName: lastName,
 			Email: email,
 			Password: hash,
+			Role: "consumer",
 		}
 
 		inserted, err := apiCfg.UserCollection.InsertOne(context.Background(), user)
@@ -224,6 +225,22 @@ func (apiCfg *APIConfig)userLogin(email, password string) (model.User, error) {
 	return user, nil
 }
 
+func (apiCfg *APIConfig)makeAdmin(email string) (model.User, error) {
+	filter := bson.M{"email": email}
+    update := bson.M{"$set": bson.M{"role": "admin"}}
+
+    _, err := apiCfg.UserCollection.UpdateOne(context.TODO(), filter, update)
+    if err != nil {
+        log.Fatal(err)
+        return model.User{}, err
+    }
+	updatedUser, err := apiCfg.getUser(email)
+	if err != nil {
+		return model.User{}, err
+	}
+	return updatedUser, nil
+}
+
 func (apiCfg *APIConfig)getUser(email string) (model.User, error) {
 	filter := bson.M{"email":email}
 	var user model.User
@@ -239,6 +256,33 @@ func (apiCfg *APIConfig)getUser(email string) (model.User, error) {
 	
 	return user, nil
 }
+
+func (apiCfg *APIConfig) getAllUsers() ([]model.User, error) {
+    filter := bson.M{}
+    var users []model.User
+    cursor, err := apiCfg.UserCollection.Find(context.TODO(), filter)
+    if err != nil {
+        log.Fatal(err)
+        return nil, err
+    }
+    defer cursor.Close(context.TODO())
+    for cursor.Next(context.TODO()) {
+        var user model.User
+        if err := cursor.Decode(&user); err != nil {
+            log.Fatal(err)
+            return nil, err
+        }
+        users = append(users, user)
+    }
+
+    if err := cursor.Err(); err != nil {
+        log.Fatal(err)
+        return nil, err
+    }
+
+    return users, nil
+}
+
 
  
 

@@ -131,6 +131,7 @@ func (apiCfg *APIConfig)HandlerCreateAccount(w http.ResponseWriter, r *http.Requ
 		FristName: user.FristName,
 		LastName: user.LastName,
 		Email: user.Email,
+		Role: user.Role,
 	}
 	reply.RespondWithJson(w, http.StatusCreated, retUser)
 }
@@ -200,4 +201,32 @@ func (apiCfg *APIConfig)HandlerLogin(w http.ResponseWriter, r *http.Request) {
 	}
 	reply.RespondWithJson(w, http.StatusOK, retUser)
 }
+
+func (apiCfg *APIConfig) HandlerGetAllUsers(w http.ResponseWriter, r *http.Request) {
+	users, err := apiCfg.getAllUsers()
+	if err != nil {
+		reply.RespondWtihError(w, http.StatusNotFound, "couldn't get users")
+		return 
+	}
+	reply.RespondWithJson(w, http.StatusFound, users)
+}
+
+func (apiCfg *APIConfig) HandlerMakeAdmin(w http.ResponseWriter, r *http.Request) {
+	email := r.URL.Query().Get("email")
+	user, err := apiCfg.makeAdmin(email)
+	if err != nil {
+		reply.RespondWtihError(w, http.StatusBadRequest, "couldn't promote to admin")
+		return 
+	}
+	retUser := model.User{
+		ID: user.ID,
+		FristName: user.FristName,
+		LastName: user.LastName,
+		Email: user.Email,
+		Role: user.Role,
+	}
+	reply.RespondWithJson(w, http.StatusOK, retUser)
+}
+
+
 
