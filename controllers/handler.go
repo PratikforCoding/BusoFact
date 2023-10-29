@@ -9,6 +9,7 @@ import (
 	"github.com/PratikforCoding/BusoFact.git/auth"
 	reply "github.com/PratikforCoding/BusoFact.git/json"
 	model "github.com/PratikforCoding/BusoFact.git/models"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 func (apiCfg *APIConfig)HandlerGetBuses(w http.ResponseWriter, r *http.Request) {
@@ -75,6 +76,20 @@ func (apiCfg *APIConfig)HandlerGetBusByName(w http.ResponseWriter, r *http.Reque
 }
 
 func (apiCfg *APIConfig) HandlerAddStopage(w http.ResponseWriter, r *http.Request) {
+
+	token, err := auth.GetTokenFromCookie(r, apiCfg.jwtSecret)
+	if err != nil {	
+		reply.RespondWtihError(w, http.StatusUnauthorized, "Couldn't get token from request")
+		return
+	}
+
+	claims, err := auth.ValidateJWT(token, apiCfg.jwtSecret)
+	if err != nil {
+		reply.RespondWtihError(w, http.StatusUnauthorized, "Couldn't validate token")
+		return
+	}
+	fmt.Println(claims)
+
 	type parameters struct {
 		Name string `json:"name"`
 		StopageName string `json:"stopageName"`
@@ -83,7 +98,7 @@ func (apiCfg *APIConfig) HandlerAddStopage(w http.ResponseWriter, r *http.Reques
 
 	decoder := json.NewDecoder(r.Body);
 	params := parameters{}
-	err := decoder.Decode(&params)
+	err = decoder.Decode(&params)
 	if err != nil {
 		reply.RespondWtihError(w, http.StatusInternalServerError, "Couldn't decode parameters")
 		return
@@ -203,6 +218,37 @@ func (apiCfg *APIConfig)HandlerLogin(w http.ResponseWriter, r *http.Request) {
 }
 
 func (apiCfg *APIConfig) HandlerGetAllUsers(w http.ResponseWriter, r *http.Request) {
+
+	token, err := auth.GetTokenFromCookie(r, apiCfg.jwtSecret)
+	if err != nil {	
+		reply.RespondWtihError(w, http.StatusUnauthorized, "Couldn't get token from request")
+		return
+	}
+
+	claims, err := auth.ValidateJWT(token, apiCfg.jwtSecret)
+	if err != nil {
+		reply.RespondWtihError(w, http.StatusUnauthorized, "Couldn't validate token")
+		return
+	}
+
+	objectID, err := primitive.ObjectIDFromHex(claims)
+    if err != nil {
+		reply.RespondWtihError(w, http.StatusInternalServerError, "Couldn't get objectId")
+        return 
+    }
+
+	user, err := apiCfg.getUserFromId(objectID)
+	if err != nil {
+		reply.RespondWtihError(w, http.StatusInternalServerError, "Couldn't get user")
+		return
+	}
+	
+	userRole := user.Role
+    if userRole != "admin" {
+        reply.RespondWithJson(w, http.StatusForbidden, "You don't have permission to access this resource.")
+        return
+    }
+
 	users, err := apiCfg.getAllUsers()
 	if err != nil {
 		reply.RespondWtihError(w, http.StatusNotFound, "couldn't get users")
@@ -212,8 +258,39 @@ func (apiCfg *APIConfig) HandlerGetAllUsers(w http.ResponseWriter, r *http.Reque
 }
 
 func (apiCfg *APIConfig) HandlerMakeAdmin(w http.ResponseWriter, r *http.Request) {
+
+	token, err := auth.GetTokenFromCookie(r, apiCfg.jwtSecret)
+	if err != nil {	
+		reply.RespondWtihError(w, http.StatusUnauthorized, "Couldn't get token from request")
+		return
+	}
+
+	claims, err := auth.ValidateJWT(token, apiCfg.jwtSecret)
+	if err != nil {
+		reply.RespondWtihError(w, http.StatusUnauthorized, "Couldn't validate token")
+		return
+	}
+
+	objectID, err := primitive.ObjectIDFromHex(claims)
+    if err != nil {
+		reply.RespondWtihError(w, http.StatusInternalServerError, "Couldn't get objectId")
+        return 
+    }
+
+	user, err := apiCfg.getUserFromId(objectID)
+	if err != nil {
+		reply.RespondWtihError(w, http.StatusInternalServerError, "Couldn't get user")
+		return
+	}
+	
+	userRole := user.Role
+    if userRole != "admin" {
+        reply.RespondWithJson(w, http.StatusForbidden, "You don't have permission to access this resource.")
+        return
+    }
+
 	email := r.URL.Query().Get("email")
-	user, err := apiCfg.makeAdmin(email)
+	user, err = apiCfg.makeAdmin(email)
 	if err != nil {
 		reply.RespondWtihError(w, http.StatusBadRequest, "couldn't promote to admin")
 		return 
@@ -226,6 +303,106 @@ func (apiCfg *APIConfig) HandlerMakeAdmin(w http.ResponseWriter, r *http.Request
 		Role: user.Role,
 	}
 	reply.RespondWithJson(w, http.StatusOK, retUser)
+}
+
+func (apiCfg *APIConfig) HandlerDeleteBus(w http.ResponseWriter, r *http.Request) {
+	type parameters struct {
+		Name string `json:"name"`
+	}
+
+	token, err := auth.GetTokenFromCookie(r, apiCfg.jwtSecret)
+	if err != nil {	
+		reply.RespondWtihError(w, http.StatusUnauthorized, "Couldn't get token from request")
+		return
+	}
+
+	claims, err := auth.ValidateJWT(token, apiCfg.jwtSecret)
+	if err != nil {
+		reply.RespondWtihError(w, http.StatusUnauthorized, "Couldn't validate token")
+		return
+	}
+
+	objectID, err := primitive.ObjectIDFromHex(claims)
+	if err != nil {
+		reply.RespondWtihError(w, http.StatusInternalServerError, "Couldn't get objectId")
+		return
+	}
+	user, err := apiCfg.getUserFromId(objectID)
+	if err != nil {
+		reply.RespondWtihError(w, http.StatusInternalServerError, "Couldn't get user")
+		return
+	}
+	
+	userRole := user.Role
+    if userRole != "admin" {
+        reply.RespondWithJson(w, http.StatusForbidden, "You don't have permission to access this resource.")
+        return
+    }
+
+	decoder := json.NewDecoder(r.Body)
+	params := parameters{}
+	err = decoder.Decode(&params)
+	if err != nil {
+		reply.RespondWtihError(w, http.StatusInternalServerError, "Couldn't decode parameters")
+		return
+	}
+
+	err = apiCfg.deleteBus(params.Name)
+	if err != nil {
+		reply.RespondWtihError(w, http.StatusInternalServerError, "couldn't delete the bus")
+		return
+	}
+	reply.RespondWithJson(w, http.StatusOK, "Bus deleted successfully")
+}
+
+func (apiCfg *APIConfig) HandlerDeleteUser(w http.ResponseWriter, r *http.Request) {
+	type parameters struct {
+		Email string `json:"email"`
+	}
+
+	token, err := auth.GetTokenFromCookie(r, apiCfg.jwtSecret)
+	if err != nil {	
+		reply.RespondWtihError(w, http.StatusUnauthorized, "Couldn't get token from request")
+		return
+	}
+
+	claims, err := auth.ValidateJWT(token, apiCfg.jwtSecret)
+	if err != nil {
+		reply.RespondWtihError(w, http.StatusUnauthorized, "Couldn't validate token")
+		return
+	}
+
+	objectID, err := primitive.ObjectIDFromHex(claims)
+	if err != nil {
+		reply.RespondWtihError(w, http.StatusInternalServerError, "Couldn't get objectId")
+		return
+	}
+	user, err := apiCfg.getUserFromId(objectID)
+	if err != nil {
+		reply.RespondWtihError(w, http.StatusInternalServerError, "Couldn't get user")
+		return
+	}
+	
+	userRole := user.Role
+	if userRole != "admin" {
+		reply.RespondWithJson(w, http.StatusForbidden, "You don't have permission to access this resource.")
+		return
+	}
+
+	decoder := json.NewDecoder(r.Body)
+	params := parameters{}
+	err = decoder.Decode(&params)
+	if err != nil {
+		reply.RespondWtihError(w, http.StatusInternalServerError, "Couldn't decode parameters")
+		return
+	}
+
+	err = apiCfg.deleteUser(params.Email)
+	if err != nil {
+		reply.RespondWtihError(w, http.StatusInternalServerError, "couldn't delete the user")
+		return
+	}
+	reply.RespondWithJson(w, http.StatusOK, "User deleted successfully")
 }
 
 

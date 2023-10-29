@@ -98,20 +98,23 @@ func (apiCfg *APIConfig) addBusStopage(name, stopage, beforeStopage string) (bso
 
     // Get the existing stopages
     existingStopages := foundBus["stopages"].(primitive.A)
-
+	
     // Find the existing stopage with "beforeStopage" and its position
-    var beforeStopageIndex int
+    var beforeStopageIndex int = -1
     var beforeStopageNumber int32
 
     for i, s := range existingStopages {
-        stop := s.(primitive.M)
-        if stop["stopage"].(string) == beforeStopage {
-            beforeStopageIndex = i
-            beforeStopageNumber = stop["stopageNumber"].(int32)
-            break
-        }
-    }
-
+		if stop, ok := s.(primitive.M); ok {
+			if stopageName, exists := stop["stopageName"].(string); exists {
+				if stopageName == beforeStopage {
+					beforeStopageIndex = i
+					beforeStopageNumber, _ = stop["stopageNumber"].(int32)
+					break
+				}
+			}
+		}
+	}
+	
     if beforeStopageIndex < 0 {
         return bson.M{}, errors.New("beforeStopage not found")
     }
@@ -120,7 +123,7 @@ func (apiCfg *APIConfig) addBusStopage(name, stopage, beforeStopage string) (bso
 
     newStopage := bson.M{
         "stopageNumber": newStopageNumber,
-        "stopage":      stopage,
+        "stopageName":      stopage,
     }
 
     // Create an empty primitive.A slice for updated stopages
@@ -283,6 +286,38 @@ func (apiCfg *APIConfig) getAllUsers() ([]model.User, error) {
     return users, nil
 }
 
+func (apiCfg *APIConfig) getUserFromId(userID primitive.ObjectID) (model.User, error) {
+    filter := bson.M{"_id": userID}
+    var user model.User
+    err := apiCfg.UserCollection.FindOne(context.TODO(), filter).Decode(&user)
+    if err != nil {
+        if err == mongo.ErrNoDocuments {
+            fmt.Println("User not found")
+            return model.User{}, errors.New("user not found")
+        } else {
+            log.Fatal(err)
+        }
+    }
+    return user, nil
+}
 
- 
+func (apiCfg *APIConfig) deleteBus(name string) error {
+	filter := bson.M{"name": name}
+	_, err := apiCfg.BusCollection.DeleteOne(context.Background(), filter)
+	if err != nil {
+		log.Fatal(err)
+		return err
+	}
+	return nil
+}
+
+func(apiCfg *APIConfig) deleteUser(email string) error {
+	filter := bson.M{"email": email}
+	_, err := apiCfg.UserCollection.DeleteOne(context.Background(), filter)
+	if err != nil {
+		log.Fatal(err)
+		return err
+	}
+	return nil
+}
 
