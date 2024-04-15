@@ -242,7 +242,7 @@ func (apiCfg *APIConfig) HandlerGetAllUsers(w http.ResponseWriter, r *http.Reque
 		reply.RespondWtihError(w, http.StatusInternalServerError, "Couldn't get user")
 		return
 	}
-	
+	 
 	userRole := user.Role
     if userRole != "admin" {
         reply.RespondWithJson(w, http.StatusForbidden, "You don't have permission to access this resource.")
