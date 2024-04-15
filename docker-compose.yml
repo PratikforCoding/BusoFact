@@ -1,0 +1,8 @@
+version: "1"
+
+services:
+  busofact: 
+    build: .
+    ports:
+      - "8080:8080"
+
