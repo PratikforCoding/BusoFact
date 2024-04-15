@@ -1,13 +1,23 @@
-FROM golang:1.22.2-alpine3.19
+FROM golang:1.22.2-alpine3.19 as builder
+
+WORKDIR /build
+
+COPY . /build/
+
+RUN CGO_ENABLED=0 GOOS=linux go build -o busofact .
+
+FROM alpine
+
+RUN adduser -S -D -H -h /app appuser
+
+USER appuser
+
+COPY . /app
+
+COPY --from=builder /build/busofact /app/
 
 WORKDIR /app
 
-COPY . /app/
-
-RUN go mod download
-
-RUN CGO_ENABLED=0 GOOS=linux go build -o /BusoFact
-
 EXPOSE 8080
 
-CMD [ "/BusoFact" ]
+CMD [ "./busofact" ]
